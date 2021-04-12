@@ -45,8 +45,8 @@ public class ApiVerticle extends AbstractVerticle {
     router.post().handler(bodyHandler::handle);
 
     router.get("/products").respond(rc -> listProducts());
-    router.get("/products/:id").respond(this::fetchProduct);
-    router.post("/products").respond(this::registerProduct);
+    router.get("/products/:id").respond(this::getProduct);
+    router.post("/products").respond(this::createProduct);
 
     Uni<HttpServer> startHttpServer = vertx.createHttpServer()
       .requestHandler(router::handle)
@@ -71,8 +71,8 @@ public class ApiVerticle extends AbstractVerticle {
       .onFailure().recoverWithItem(new JsonArray());
   }
 
-  private Uni<Void> registerProduct(RoutingContext rc) {
-    logger.info("registerProduct");
+  private Uni<Void> createProduct(RoutingContext rc) {
+    logger.info("createProduct");
 
     JsonObject json = rc.getBodyAsJson();
     String name;
@@ -93,8 +93,8 @@ public class ApiVerticle extends AbstractVerticle {
       .onFailure().invoke(err -> logger.error("Woops", err));
   }
 
-  private Uni<JsonObject> fetchProduct(RoutingContext rc) {
-    logger.info("fetchProduct");
+  private Uni<JsonObject> getProduct(RoutingContext rc) {
+    logger.info("getProduct");
     Long id = Long.valueOf(rc.pathParam("id"));
 
     return pgPool.preparedQuery("SELECT * FROM Product WHERE id=$1")
@@ -109,5 +109,6 @@ public class ApiVerticle extends AbstractVerticle {
       })
       .onFailure().invoke(err -> logger.error("Woops", err));
   }
+
 }
 
