@@ -64,10 +64,7 @@ public class ApiVerticle extends AbstractVerticle {
       .onItem().transform(rowset -> {
         JsonArray data = new JsonArray();
         for (Row row : rowset) {
-          data.add(new JsonObject()
-            .put("id", row.getValue("id"))
-            .put("name", row.getValue("name"))
-            .put("price", row.getValue("price")));
+          data.add(row.toJson());
         }
         return data;
       })
@@ -105,11 +102,7 @@ public class ApiVerticle extends AbstractVerticle {
       .onItem().transform(rows -> {
         RowIterator<Row> iterator = rows.iterator();
         if (iterator.hasNext()) {
-          Row row = iterator.next();
-          return new JsonObject()
-            .put("id", row.getValue("id"))
-            .put("name", row.getValue("name"))
-            .put("price", row.getValue("price"));
+          return iterator.next().toJson();
         } else {
           return new JsonObject();
         }
