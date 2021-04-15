@@ -9,6 +9,7 @@ import io.vertx.mutiny.ext.web.handler.BodyHandler;
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.RowIterator;
+import io.vertx.mutiny.sqlclient.RowSet;
 import io.vertx.mutiny.sqlclient.Tuple;
 import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.sqlclient.PoolOptions;
@@ -59,8 +60,9 @@ public class ApiVerticle extends AbstractVerticle {
   private Uni<JsonArray> listProducts() {
     logger.info("listProducts");
 
-    return pgPool.query("SELECT * FROM Product")
-      .execute()
+    Uni<RowSet<Row>> execute = pgPool.query("SELECT * FROM Product")
+      .execute();
+    return execute
       .onItem().transform(rowset -> {
         JsonArray data = new JsonArray();
         for (Row row : rowset) {
@@ -71,7 +73,7 @@ public class ApiVerticle extends AbstractVerticle {
       .onFailure().recoverWithItem(new JsonArray());
   }
 
-  private Uni<Void> createProduct(RoutingContext rc) {
+  private Uni<JsonObject> createProduct(RoutingContext rc) {
     logger.info("createProduct");
 
     JsonObject json = rc.getBodyAsJson();
@@ -87,9 +89,15 @@ public class ApiVerticle extends AbstractVerticle {
       return Uni.createFrom().failure(err);
     }
 
-    return pgPool.preparedQuery("INSERT INTO Product(name, price) VALUES ($1, $2)")
+    return pgPool.preparedQuery("INSERT INTO Product(name, price) VALUES ($1, $2) RETURNING id")
       .execute(Tuple.of(name, price))
-      .onItem().ignore().andContinueWithNull()
+      .onItem().transform(rowSet -> {
+        Row row = rowSet.iterator().next();
+        return new JsonObject()
+          .put("id", row.getInteger("id"))
+          .put("name", name)
+          .put("price", price);
+      })
       .onFailure().invoke(err -> logger.error("Woops", err));
   }
 
@@ -97,9 +105,11 @@ public class ApiVerticle extends AbstractVerticle {
     logger.info("getProduct");
     Long id = Long.valueOf(rc.pathParam("id"));
 
-    return pgPool.preparedQuery("SELECT * FROM Product WHERE id=$1")
+    return pgPool
+      .preparedQuery("SELECT * FROM Product WHERE id=$1")
       .execute(Tuple.of(id))
-      .onItem().transform(rows -> {
+      .onItem()
+      .transform(rows -> {
         RowIterator<Row> iterator = rows.iterator();
         if (iterator.hasNext()) {
           return iterator.next().toJson();
